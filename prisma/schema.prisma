@@ -1,0 +1,922 @@
+// ============================================================
+// Yemen Store — Full Data Model (Prisma / SQLite)
+// المرجع: PLAN.md قسم 73 + قرارات worklog Task 0
+// ملاحظة: SQLite لا يدعم Enums → كل الحالات String مع تحقق Zod
+// المبالغ: Int بوحدات الريال اليمني (YER) — لا floating point
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============ 1) الهوية والوصول ============
+
+model User {
+  id          String   @id @default(cuid())
+  phone       String   @unique
+  name        String
+  email       String?
+  // SUPER_ADMIN | MANAGER | ACCOUNTANT | WAREHOUSE | CONTENT_MANAGER | DELIVERY_OPERATOR | CUSTOMER
+  role        String   @default("CUSTOMER")
+  // ACTIVE | SUSPENDED | BLOCKED
+  status      String   @default("ACTIVE")
+  avatarUrl   String?
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sessions     UserSession[]
+  customer     Customer?
+  auditLogs    AuditLog[]
+  notifications Notification[]
+}
+
+model UserSession {
+  id            String    @id @default(cuid())
+  token         String    @unique
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceInfo    String?
+  ip            String?
+  lastActiveAt  DateTime  @default(now())
+  revokedAt     DateTime?
+  revokedReason String?
+  createdAt     DateTime  @default(now())
+}
+
+// ============ 2) العملاء والعناوين ============
+
+model Customer {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // NEW | REGULAR | VIP | INACTIVE | BLOCKED
+  tier          String   @default("NEW")
+  creditBalance Int      @default(0)
+  totalSpent    Int      @default(0)
+  ordersCount   Int      @default(0)
+  riskFlags     String   @default("")
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  addresses      CustomerAddress[]
+  orders         Order[]
+  returnRequests ReturnRequest[]
+  favorites      Favorite[]
+  reviews        Review[]
+  tickets        SupportTicket[]
+  couponRedemptions CouponRedemption[]
+}
+
+model CustomerAddress {
+  id            String  @id @default(cuid())
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label         String  @default("عنوان")
+  governorate   String
+  city          String
+  district      String  @default("")
+  neighborhood  String  @default("")
+  street        String  @default("")
+  landmark      String  @default("")
+  phone         String
+  notes         String?
+  latitude      String?
+  longitude     String?
+  isDefault     Boolean @default(false)
+  createdAt     DateTime @default(now())
+}
+
+// ============ 3) الكتالوج ============
+
+model Category {
+  id        String  @id @default(cuid())
+  name      String
+  slug      String  @unique
+  imageUrl  String?
+  parentId  String?
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  products  Product[]
+}
+
+model Brand {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logoUrl   String?
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  products  Product[]
+}
+
+model Product {
+  id             String   @id @default(cuid())
+  name           String
+  slug           String   @unique
+  description    String   @default("")
+  categoryId     String
+  category       Category @relation(fields: [categoryId], references: [id])
+  brandId        String?
+  brand          Brand?   @relation(fields: [brandId], references: [id])
+  basePrice      Int
+  compareAtPrice Int?
+  costPrice      Int?
+  sku            String?
+  barcode        String?
+  // DRAFT | ACTIVE | ARCHIVED
+  status         String   @default("ACTIVE")
+  weightGrams    Int?
+  videoUrl       String?
+  imageUrl       String?
+  isFeatured     Boolean  @default(false)
+  sortOrder      Int      @default(0)
+  salesCount     Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  variants ProductVariant[]
+  images   ProductImage[]
+  reviews  Review[]
+  favorites Favorite[]
+}
+
+model ProductVariant {
+  id              String   @id @default(cuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // JSON: {"اللون":"أسود","المقاس":"M"}
+  attributesJson  String   @default("{}")
+  sku             String?  @unique
+  barcode         String?
+  priceOverride   Int?
+  costOverride    Int?
+  discountPercent Int      @default(0)
+  weightGrams     Int?
+  imageUrl        String?
+  active          Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  images       ProductImage[]
+  balances     InventoryBalance[]
+  movements    StockMovement[]
+  purchaseItems PurchaseItem[]
+  reservations StockReservation[]
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String?
+  sortOrder Int     @default(0)
+}
+
+// ============ 4) الطلبات ============
+
+model Order {
+  id              String   @id @default(cuid())
+  orderNumber     String   @unique
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  // snapshot كامل للعنوان وقت الطلب
+  addressJson     String
+  // حالات OrderStatus الموحدة
+  status          String   @default("PENDING_PAYMENT")
+  paymentStatus   String   @default("UNPAID")
+  itemsTotal      Int      @default(0)
+  discountTotal   Int      @default(0)
+  couponCode      String?
+  shippingFee     Int      @default(0)
+  grandTotal      Int      @default(0)
+  currency        String   @default("YER")
+  shippingMethod  String   @default("")
+  paymentMethod   String   @default("BANK_TRANSFER")
+  paymentReference String?
+  trackingCode    String?
+  idempotencyKey  String?  @unique
+  customerNote    String?
+  adminNote       String?
+  version         Int      @default(1)
+  placedAt        DateTime @default(now())
+  confirmedAt     DateTime?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  cancelReason    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items          OrderItem[]
+  statusHistory  OrderStatusHistory[]
+  events         OrderEvent[]
+  payments       Payment[]
+  shipments      Shipment[]
+  reservations   StockReservation[]
+  refunds        Refund[]
+  returnRequests ReturnRequest[]
+  invoice        Invoice?
+}
+
+model OrderItem {
+  id               String  @id @default(cuid())
+  orderId          String
+  order            Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId        String
+  variantId        String
+  productName      String
+  skuSnapshot      String?
+  attributesJson   String  @default("{}")
+  imageUrl         String?
+  unitPrice        Int
+  comparePrice     Int?
+  discountPercent  Int     @default(0)
+  quantity         Int
+  lineTotal        Int
+  costSnapshot     Int?
+
+  returnItems ReturnItem[]
+}
+
+model OrderStatusHistory {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus  String?
+  toStatus    String
+  changedById String?
+  reason      String?
+  note        String?
+  createdAt   DateTime @default(now())
+}
+
+model OrderEvent {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type      String
+  dataJson  String   @default("{}")
+  // عرض في Timeline العميل؟
+  customerVisible Boolean @default(true)
+  createdAt DateTime @default(now())
+}
+
+// ============ 5) الدفع ============
+
+model PaymentMethod {
+  id          String   @id @default(cuid())
+  code        String   @unique // BANK_TRANSFER | COD
+  name        String
+  description String   @default("")
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+}
+
+model PaymentAccount {
+  id           String   @id @default(cuid())
+  // BANK | WALLET | OTHER
+  type         String   @default("BANK")
+  name         String
+  institution  String
+  beneficiary  String
+  accountNumber String
+  iban         String?
+  walletNumber String?
+  phone        String?
+  branch       String?
+  instructions String   @default("")
+  displayToCustomers Boolean @default(true)
+  active       Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  currency     String   @default("YER")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  payments     Payment[]
+}
+
+model Payment {
+  id                String   @id @default(cuid())
+  paymentNumber     String   @unique // PAY-XXXXXX
+  orderId           String
+  order             Order    @relation(fields: [orderId], references: [id])
+  paymentAccountId  String?
+  paymentAccount    PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  accountSnapshotJson String?
+  methodCode        String   @default("BANK_TRANSFER")
+  // PaymentStatus الموحدة
+  status            String   @default("UNPAID")
+  expectedAmount    Int      @default(0)
+  submittedAmount   Int?
+  paidAmount        Int      @default(0)
+  refundedAmount    Int      @default(0)
+  overpayment       Int      @default(0)
+  currency          String   @default("YER")
+  customerTransferRef String?
+  transferDate      DateTime?
+  senderName        String?
+  proofUrl          String?
+  notes             String?
+  // DUPLICATE,AMOUNT_MISMATCH,...
+  riskFlags         String   @default("")
+  duplicateOfId     String?
+  reviewedById      String?
+  reviewedAt        DateTime?
+  rejectReason      String?
+  submittedAt       DateTime?
+  verifiedAt        DateTime?
+  expiresAt         DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  events  PaymentEvent[]
+  refunds Refund[]
+}
+
+model PaymentEvent {
+  id        String   @id @default(cuid())
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  type      String
+  dataJson  String   @default("{}")
+  actorId   String?
+  createdAt DateTime @default(now())
+}
+
+// ============ 6) الفواتير ============
+
+model Invoice {
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique // INV-XXXXXX
+  orderId       String   @unique
+  order         Order    @relation(fields: [orderId], references: [id])
+  snapshotJson  String
+  total         Int
+  currency      String   @default("YER")
+  issuedAt      DateTime @default(now())
+}
+
+// ============ 7) المخزون ============
+
+model Warehouse {
+  id        String   @id @default(cuid())
+  name      String
+  code      String?
+  city      String   @default("")
+  isDefault Boolean  @default(false)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  balances   InventoryBalance[]
+  movements  StockMovement[]
+  purchases  Purchase[]
+}
+
+model InventoryBalance {
+  id          String  @id @default(cuid())
+  variantId   String
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  onHand      Int     @default(0)
+  reserved    Int     @default(0)
+  reorderLevel Int    @default(5)
+
+  @@unique([variantId, warehouseId])
+}
+
+model StockReservation {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId   String
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  warehouseId String
+  quantity    Int
+  // ACTIVE | RELEASED | CONVERTED
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  releasedAt  DateTime?
+}
+
+model StockMovement {
+  id           String   @id @default(cuid())
+  variantId    String
+  variant      ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  warehouseId  String
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  quantityDelta Int
+  // PURCHASE_RECEIPT | ORDER_RESERVATION | ORDER_RELEASE | SALE | RETURN | DAMAGE | ADJUSTMENT | TRANSFER_OUT | TRANSFER_IN | STOCK_ISSUE
+  movementType String
+  refType      String?
+  refId        String?
+  refNumber    String?
+  reason       String?
+  userId       String?
+  balanceAfter Int?
+  createdAt    DateTime @default(now())
+}
+
+// ============ 8) الشحن ============
+
+model ShippingMethod {
+  id          String   @id @default(cuid())
+  code        String   @unique // HOME_DELIVERY | PICKUP | COURIER
+  name        String
+  description String   @default("")
+  // PICKUP fee=0 دائمًا؛ غيرها حسب المنطقة
+  baseFee     Int      @default(0)
+  etaNote     String?
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+}
+
+model ShippingZone {
+  id          String   @id @default(cuid())
+  governorate String
+  city        String   @default("")
+  fee         Int
+  etaDays     Int      @default(3)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  @@unique([governorate, city])
+}
+
+model Shipment {
+  id             String   @id @default(cuid())
+  shipmentNumber String   @unique
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id])
+  methodCode     String   @default("HOME_DELIVERY")
+  methodName     String   @default("")
+  providerName   String   @default("")
+  fee            Int      @default(0)
+  trackingCode   String   @unique
+  // ShipmentStatus الموحدة
+  status         String   @default("PENDING")
+  codCollected   Int      @default(0)
+  shippedAt      DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  events   ShipmentEvent[]
+  attempts DeliveryAttempt[]
+}
+
+model ShipmentEvent {
+  id         String   @id @default(cuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  status     String
+  note       String?
+  actorId    String?
+  createdAt  DateTime @default(now())
+}
+
+model DeliveryAttempt {
+  id         String   @id @default(cuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  // SUCCEEDED | FAILED
+  status     String
+  reason     String?
+  note       String?
+  actorId    String?
+  createdAt  DateTime @default(now())
+}
+
+// ============ 9) الإرجاع والاسترداد ============
+
+model ReturnRequest {
+  id            String   @id @default(cuid())
+  returnNumber  String   @unique // RET-XXXXXX
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id])
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id])
+  reason        String
+  customerNote  String?
+  photosJson    String   @default("[]")
+  // ReturnStatus الموحدة
+  status        String   @default("REQUESTED")
+  replacementJson String? // لطلبات الاستبدال
+  reviewedById  String?
+  reviewedAt    DateTime?
+  rejectReason  String?
+  receivedAt    DateTime?
+  inspectedAt   DateTime?
+  inspectionNote String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items   ReturnItem[]
+  refunds Refund[]
+}
+
+model ReturnItem {
+  id              String  @id @default(cuid())
+  returnRequestId String
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  orderItemId     String
+  orderItem       OrderItem @relation(fields: [orderItemId], references: [id])
+  quantity        Int
+  // RESALE | DAMAGED | UNKNOWN
+  condition       String  @default("UNKNOWN")
+  note            String?
+}
+
+model Refund {
+  id             String   @id @default(cuid())
+  refundNumber   String   @unique // REF-XXXXXX
+  orderId        String?
+  order          Order?   @relation(fields: [orderId], references: [id])
+  returnRequestId String?
+  returnRequest  ReturnRequest? @relation(fields: [returnRequestId], references: [id])
+  paymentId      String?
+  payment        Payment? @relation(fields: [paymentId], references: [id])
+  amount         Int
+  // BANK | CASH | CREDIT
+  method         String   @default("BANK")
+  bankAccountId  String?
+  // RefundStatus الموحدة
+  status         String   @default("REQUESTED")
+  reason         String?
+  approvedById   String?
+  processedById  String?
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  events RefundEvent[]
+}
+
+model RefundEvent {
+  id        String   @id @default(cuid())
+  refundId  String
+  refund    Refund   @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  type      String
+  dataJson  String   @default("{}")
+  actorId   String?
+  createdAt DateTime @default(now())
+}
+
+// ============ 10) المشتريات والموردون ============
+
+model Supplier {
+  id      String   @id @default(cuid())
+  name    String
+  phone   String?
+  email   String?
+  address String?
+  notes   String?
+  active  Boolean  @default(true)
+  balance Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchases Purchase[]
+  payments  SupplierPayment[]
+}
+
+model Purchase {
+  id            String   @id @default(cuid())
+  purchaseNumber String  @unique // PUR-XXXXXX
+  supplierId    String
+  supplier      Supplier @relation(fields: [supplierId], references: [id])
+  warehouseId   String
+  warehouse     Warehouse @relation(fields: [warehouseId], references: [id])
+  invoiceRef    String?
+  date          DateTime @default(now())
+  subtotal      Int      @default(0)
+  discount      Int      @default(0)
+  total         Int      @default(0)
+  paid          Int      @default(0)
+  // DRAFT | RECEIVED | PARTIALLY_PAID | PAID | CANCELLED
+  status        String   @default("DRAFT")
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items   PurchaseItem[]
+  payments SupplierPayment[]
+}
+
+model PurchaseItem {
+  id             String  @id @default(cuid())
+  purchaseId     String
+  purchase       Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  variantId      String
+  variant        ProductVariant @relation(fields: [variantId], references: [id])
+  quantity       Int
+  unitCost       Int
+  lineTotal      Int
+}
+
+model SupplierPayment {
+  id            String   @id @default(cuid())
+  supplierId    String
+  supplier      Supplier @relation(fields: [supplierId], references: [id])
+  purchaseId    String?
+  purchase      Purchase? @relation(fields: [purchaseId], references: [id])
+  bankAccountId String?
+  amount        Int
+  // BANK | CASH
+  method        String   @default("CASH")
+  reference     String?
+  note          String?
+  date          DateTime @default(now())
+  createdById   String?
+  createdAt     DateTime @default(now())
+}
+
+// ============ 11) المالية ============
+
+model BankAccount {
+  id             String   @id @default(cuid())
+  name           String
+  institution    String
+  // BANK | WALLET | CASH
+  type           String   @default("BANK")
+  accountNumber  String
+  beneficiary    String
+  openingBalance Int      @default(0)
+  currentBalance Int      @default(0)
+  currency       String   @default("YER")
+  active         Boolean  @default(true)
+  // الربط بحساب الدفع المعروض للعميل (اختياري — بدون علاقة قاعدة بيانات)
+  paymentAccountRef String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  transactions BankTransaction[]
+}
+
+model BankTransaction {
+  id            String   @id @default(cuid())
+  txnNumber     String   @unique // BTX-XXXXXX
+  bankAccountId String
+  bankAccount   BankAccount @relation(fields: [bankAccountId], references: [id])
+  // IN | OUT
+  direction     String
+  amount        Int
+  // CUSTOMER_PAYMENT | REFUND | EXPENSE | SUPPLIER_PAYMENT | TRANSFER_IN | TRANSFER_OUT | ADJUSTMENT | FEE | COD_COLLECTION | OPENING
+  txnType       String
+  refType       String?
+  refId         String?
+  refNumber     String?
+  description   String   @default("")
+  date          DateTime @default(now())
+  // UNRECONCILED | MATCHED | PARTIAL_MATCH | DISPUTED
+  reconciliationStatus String @default("UNRECONCILED")
+  reconciledAt  DateTime?
+  createdAt     DateTime @default(now())
+}
+
+model Expense {
+  id            String   @id @default(cuid())
+  expenseNumber String   @unique // EXP-XXXXXX
+  category      String
+  description   String
+  amount        Int
+  // null = نقدًا
+  bankAccountId String?
+  date          DateTime @default(now())
+  receiptUrl    String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+}
+
+// ============ 12) العروض والكوبونات ============
+
+model Coupon {
+  id               String   @id @default(cuid())
+  code             String   @unique
+  // PERCENT | FIXED
+  type             String
+  value            Int
+  minCart          Int      @default(0)
+  maxDiscount      Int?
+  usageLimit       Int?
+  usedCount        Int      @default(0)
+  perCustomerLimit Int      @default(1)
+  startsAt         DateTime @default(now())
+  endsAt           DateTime?
+  // ALL | PRODUCTS | CATEGORIES
+  appliesTo        String   @default("ALL")
+  targetsJson      String   @default("[]")
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  redemptions      CouponRedemption[]
+}
+
+model CouponRedemption {
+  id             String   @id @default(cuid())
+  couponId       String
+  coupon         Coupon   @relation(fields: [couponId], references: [id])
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id])
+  orderId        String
+  discountAmount Int
+  createdAt      DateTime @default(now())
+}
+
+// ============ 13) المحتوى الديناميكي ============
+
+model Banner {
+  id        String   @id @default(cuid())
+  title     String?
+  subtitle  String?
+  imageUrl  String
+  // NONE | CATEGORY | PRODUCT | PAGE
+  actionType String  @default("NONE")
+  target    String?
+  startsAt  DateTime @default(now())
+  endsAt    DateTime?
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model HomeSection {
+  id        String  @id @default(cuid())
+  // BANNER | CATEGORIES | FEATURED | BEST_SELLERS | NEW_ARRIVALS | OFFERS | BRANDS | CUSTOM
+  type      String
+  title     String?
+  configJson String @default("{}")
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+}
+
+model ContentPage {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  content   String
+  published Boolean  @default(true)
+  sortOrder Int      @default(0)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+// ============ 14) الدعم والإشعارات والتقييمات ============
+
+model SupportTicket {
+  id           String   @id @default(cuid())
+  ticketNumber String   @unique // TKT-XXXXXX
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  orderId      String?
+  // ORDER | PAYMENT | RETURN | SHIPPING | OTHER
+  category     String   @default("OTHER")
+  subject      String
+  // TicketStatus الموحدة
+  status       String   @default("OPEN")
+  assignedToId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  messages SupportMessage[]
+}
+
+model SupportMessage {
+  id         String   @id @default(cuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  // CUSTOMER | STAFF
+  senderType String
+  senderId   String?
+  senderName String
+  body       String
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  // view name للانتقال عند الضغط (واجهة SPA)
+  linkView  String?
+  linkParam String?
+  role      String?  // null = إشعار مستخدم محدد
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customerId String
+  customer  Customer @relation(fields: [customerId], references: [id])
+  orderId   String?
+  rating    Int
+  comment   String?
+  // PENDING | APPROVED | HIDDEN
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  customerId String
+  customer  Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([customerId, productId])
+}
+
+// ============ 15) التحكم المركزي ============
+
+model FeatureFlag {
+  key        String   @id
+  value      Boolean  @default(true)
+  label      String   @default("")
+  updatedById String?
+  reason     String?
+  updatedAt  DateTime @updatedAt
+}
+
+model AppSetting {
+  key        String   @id
+  value      String
+  group      String   @default("general")
+  label      String   @default("")
+  updatedById String?
+  updatedAt  DateTime @updatedAt
+}
+
+model AppVersion {
+  id            String   @id @default(cuid())
+  // WEB | ANDROID | IOS
+  platform      String   @default("WEB")
+  versionName   String
+  buildNumber   Int      @default(1)
+  minimumSupported Boolean @default(false)
+  isLatest      Boolean  @default(false)
+  releaseNotes  String   @default("")
+  downloadUrl   String?
+  mandatory     Boolean  @default(false)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+}
+
+model MaintenanceWindow {
+  id        String   @id @default(cuid())
+  message   String
+  startsAt  DateTime
+  endsAt    DateTime?
+  active    Boolean  @default(true)
+  createdById String?
+  createdAt DateTime @default(now())
+}
+
+// ============ 16) التدقيق والنظام ============
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  actorId       String?
+  actor         User?    @relation(fields: [actorId], references: [id])
+  actorRole     String?
+  action        String
+  entityType    String
+  entityId      String
+  oldValuesJson String?
+  newValuesJson String?
+  reason        String?
+  ip            String?
+  createdAt     DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model SequenceCounter {
+  key   String @id
+  value Int    @default(0)
+}
+
+model IdempotencyKey {
+  key         String   @id
+  responseJson String?
+  createdAt   DateTime @default(now())
+}
