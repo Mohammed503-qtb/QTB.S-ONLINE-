@@ -108,7 +108,7 @@ export async function recordExpense(
       newValues: { category: input.category, amount: input.amount, description: input.description },
     })
     return expense
-  })
+  }, { timeout: 30_000, maxWait: 10_000 })
 }
 
 /** دفعة مورد */
@@ -167,7 +167,7 @@ export async function paySupplier(
       newValues: { amount: input.amount, method: input.method, purchaseId: input.purchaseId },
     })
     return payment
-  })
+  }, { timeout: 30_000, maxWait: 10_000 })
 }
 
 /** تحصيل COD عند التسليم */

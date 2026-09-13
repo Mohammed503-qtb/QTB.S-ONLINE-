@@ -49,7 +49,7 @@ export async function POST(req: Request) {
         data: { ticketId: t.id, senderType: 'CUSTOMER', senderId: user.id, senderName: user.name, body: body.message },
       })
       return t
-    })
+    }, { timeout: 30_000, maxWait: 10_000 })
 
     await notifyRole({
       role: 'MANAGER', type: 'NEW_TICKET',

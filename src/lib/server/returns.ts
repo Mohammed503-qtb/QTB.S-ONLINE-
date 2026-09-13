@@ -81,7 +81,7 @@ export async function createReturnRequest(input: {
       data: { orderId: input.orderId, type: 'RETURN_REQUESTED', dataJson: JSON.stringify({ returnNumber, reason: input.reason }) },
     })
     return rr
-  })
+  }, { timeout: 30_000, maxWait: 10_000 })
 
   await notifyUser(db, {
     userId: input.customerUserId,
@@ -160,7 +160,7 @@ export async function transitionReturn(input: { returnId: string; to: ReturnStat
       await tx.order.update({ where: { id: rr.orderId }, data: { status: 'DELIVERED' } })
       await tx.orderEvent.create({ data: { orderId: rr.orderId, type: 'RETURN_REJECTED', dataJson: JSON.stringify({ reason: input.reason }) } })
     }
-  })
+  }, { timeout: 30_000, maxWait: 10_000 })
 
   const customer = await db.customer.findUnique({ where: { id: rr.customerId }, include: { user: true } })
   if (customer) {
@@ -216,7 +216,7 @@ export async function createRefund(input: {
         reason: input.reason,
       },
     })
-  })
+  }, { timeout: 30_000, maxWait: 10_000 })
 
   await notifyFinanceTeam({
     type: 'REFUND_REQUESTED',
@@ -321,7 +321,7 @@ export async function completeRefund(input: { refundId: string; actor: SessionUs
       await tx.order.update({ where: { id: refund.orderId! }, data: { status: 'COMPLETED' } })
       await tx.orderEvent.create({ data: { orderId: refund.orderId!, type: 'RETURN_COMPLETED' } })
     }
-  })
+  }, { timeout: 30_000, maxWait: 10_000 })
 
   if (refund.order) {
     const customer = await db.customer.findUnique({ where: { id: refund.order.customerId }, include: { user: true } })

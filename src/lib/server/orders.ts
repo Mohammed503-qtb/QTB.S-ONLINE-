@@ -182,7 +182,7 @@ export async function createOrder(input: CreateOrderInput) {
     }
 
     return order
-  })
+  }, { timeout: 30_000, maxWait: 10_000 })
 
   // ---------- ما بعد الالتزام: توثيق + إشعارات ----------
   if (input.idempotencyKey) {
@@ -214,6 +214,11 @@ export async function createOrder(input: CreateOrderInput) {
     entityId: order.id,
     newValues: { orderNumber: order.orderNumber, grandTotal: order.grandTotal, paymentMethod: input.paymentMethodCode },
   })
+
+  // COD: فاتورة فور التأكيد المباشر (PLAN ق21 — الفاتورة عند الاعتماد)
+  if (input.paymentMethodCode === 'COD') {
+    await ensureInvoice(order.id).catch((e) => console.error('[INVOICE FAILED]', e))
+  }
 
   return { order, duplicated: false }
 }
@@ -411,7 +416,7 @@ export async function transitionOrder(
     }
 
     return updated
-  })
+  }, { timeout: 30_000, maxWait: 10_000 })
 
   // إشعار العميل + الإدارة (خارج المعاملة)
   await notifyOrderStatus(orderId, to, { note: note ?? reason ?? '' })
@@ -472,7 +477,7 @@ export async function expireStaleOrders() {
           data: { status: 'CANCELLED', cancelledAt: new Date(), cancelReason: 'انتهاء صلاحية الدفع' },
         })
         await addEvent(tx, p.orderId, 'ORDER_EXPIRED', { reason: 'لم يتم الدفع خلال المدة المحددة' })
-      })
+      }, { timeout: 30_000, maxWait: 10_000 })
       const order = await db.order.findUnique({ where: { id: p.orderId }, include: { customer: { include: { user: true } } } })
       if (order) {
         await notifyUser(db, {
@@ -528,5 +533,5 @@ export async function ensureInvoice(orderId: string) {
         total: order.grandTotal,
       },
     })
-  })
+  }, { timeout: 30_000, maxWait: 10_000 })
 }

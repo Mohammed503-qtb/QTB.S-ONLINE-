@@ -106,7 +106,7 @@ export async function POST(req: Request) {
       }
 
       return p
-    })
+    }, { timeout: 30_000, maxWait: 10_000 })
 
     // الدفعة (خارج معاملة المخزون — معاملة محاسبية مستقلة)
     if (body.paidNow > 0) {

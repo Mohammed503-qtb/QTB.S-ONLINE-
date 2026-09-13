@@ -147,7 +147,7 @@ export async function POST(req: Request) {
         await tx.productImage.create({ data: { productId: p.id, url: body.imageUrl, alt: body.name, sortOrder: 0 } })
       }
       return p
-    })
+    }, { timeout: 30_000, maxWait: 10_000 })
 
     await writeAudit({
       actor, action: 'product.create', entityType: 'product', entityId: product.id,

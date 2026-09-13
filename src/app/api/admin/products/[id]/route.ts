@@ -98,7 +98,7 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
         }
       }
       return p
-    })
+    }, { timeout: 30_000, maxWait: 10_000 })
 
     await writeAudit({
       actor, action: 'product.update', entityType: 'product', entityId: id,

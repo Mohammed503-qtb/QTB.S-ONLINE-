@@ -114,7 +114,7 @@ export async function submitPayment(
     }
 
     return p
-  })
+  }, { timeout: 30_000, maxWait: 10_000 })
 
   await notifyUser(db, {
     userId: input.customerUserId,
@@ -231,7 +231,7 @@ export async function verifyPayment(
       })
       await tx.orderEvent.create({ data: { orderId: payment.orderId, type: 'PAYMENT_VERIFIED' } })
     }
-  })
+  }, { timeout: 30_000, maxWait: 10_000 })
 
   // الفاتورة + الإشعارات + Audit (خارج المعاملة)
   if (isFullPayment) {
@@ -311,7 +311,7 @@ export async function rejectPayment(input: { paymentId: string; actor: SessionUs
     } else {
       await tx.order.update({ where: { id: payment.orderId }, data: { paymentStatus: 'REJECTED' } })
     }
-  })
+  }, { timeout: 30_000, maxWait: 10_000 })
 
   await notifyUser(db, {
     userId: payment.order.customer.user.id,
@@ -348,7 +348,7 @@ export async function requestClarification(input: { paymentId: string; actor: Se
     await tx.paymentEvent.create({
       data: { paymentId: input.paymentId, type: 'CLARIFICATION_REQUESTED', dataJson: JSON.stringify({ message: input.message }), actorId: input.actor.id },
     })
-  })
+  }, { timeout: 30_000, maxWait: 10_000 })
 
   await notifyUser(db, {
     userId: payment.order.customer.user.id,
@@ -379,7 +379,7 @@ export async function settleOverpayment(input: { paymentId: string; actor: Sessi
       await tx.paymentEvent.create({
         data: { paymentId: payment.id, type: 'OVERPAYMENT_CREDITED', dataJson: JSON.stringify({ amount: payment.overpayment }), actorId: input.actor.id },
       })
-    })
+    }, { timeout: 30_000, maxWait: 10_000 })
     await writeAudit({
       actor: input.actor,
       action: 'payment.overpayment_credit',
