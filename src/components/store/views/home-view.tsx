@@ -125,8 +125,9 @@ function BannersCarousel({ banners }: { banners: HomeData['banners'] }) {
             </CarouselItem>
           ))}
         </CarouselContent>
-        <CarouselPrevious className="end-2 start-auto" aria-label="السابق" />
-        <CarouselNext className="start-2 end-auto" aria-label="التالي" />
+        {/* الأزرار داخل حدود الكاروسيل (مضبوطة في المكوّن الأساسي — RTL) */}
+        <CarouselPrevious aria-label="السابق" />
+        <CarouselNext aria-label="التالي" />
       </Carousel>
     </section>
   )

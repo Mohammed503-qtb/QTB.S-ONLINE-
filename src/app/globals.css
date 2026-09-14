@@ -118,5 +118,8 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* منع أي تمرير أفقي للصفحة كاملة (RTL) — clip لا ينشئ حاوية
+       تمرير فلا يتعارض مع sticky الهيدر ولا fixed الشريط السفلي */
+    overflow-x: clip;
   }
 }

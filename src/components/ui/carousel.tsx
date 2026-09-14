@@ -6,6 +6,10 @@ import useEmblaCarousel, {
 } from "embla-carousel-react"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 
+// ملاحظة RTL: التطبيق عربي بالكامل (dir="rtl")، لذا الزر "السابق" عند الحافة
+// البادئة (يمين) بسهم لليمين، و"التالي" عند الحافة الختامية (يسار) بسهم لليسار.
+// الأزرار داخل حدود الكاروسيل (لا إزاحات سالبة) لمنع أي تمرير أفقي للصفحة.
+
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
@@ -185,17 +189,17 @@ function CarouselPrevious({
       variant={variant}
       size={size}
       className={cn(
-        "absolute size-8 rounded-full",
+        "absolute z-10 size-8 rounded-full shadow-md",
         orientation === "horizontal"
-          ? "top-1/2 -left-12 -translate-y-1/2"
-          : "-top-12 left-1/2 -translate-x-1/2 rotate-90",
+          ? "top-1/2 start-2 -translate-y-1/2"
+          : "top-2 start-1/2 -translate-x-1/2 rotate-90",
         className
       )}
       disabled={!canScrollPrev}
       onClick={scrollPrev}
       {...props}
     >
-      <ArrowLeft />
+      <ArrowRight />
       <span className="sr-only">Previous slide</span>
     </Button>
   )
@@ -215,17 +219,17 @@ function CarouselNext({
       variant={variant}
       size={size}
       className={cn(
-        "absolute size-8 rounded-full",
+        "absolute z-10 size-8 rounded-full shadow-md",
         orientation === "horizontal"
-          ? "top-1/2 -right-12 -translate-y-1/2"
-          : "-bottom-12 left-1/2 -translate-x-1/2 rotate-90",
+          ? "top-1/2 end-2 -translate-y-1/2"
+          : "bottom-2 start-1/2 -translate-x-1/2 rotate-90",
         className
       )}
       disabled={!canScrollNext}
       onClick={scrollNext}
       {...props}
     >
-      <ArrowRight />
+      <ArrowLeft />
       <span className="sr-only">Next slide</span>
     </Button>
   )

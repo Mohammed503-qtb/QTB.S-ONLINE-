@@ -164,17 +164,17 @@ function StoreHeader() {
         <button
           type="button"
           onClick={() => go('home')}
-          className="flex min-h-11 items-center gap-2 font-extrabold"
+          className="flex min-h-11 min-w-0 items-center gap-2 font-extrabold"
           aria-label={`${storeName} — الرئيسية`}
         >
           {logo ? (
-            <img src={logo} alt={`شعار ${storeName}`} className="size-9 rounded-xl object-contain" />
+            <img src={logo} alt={`شعار ${storeName}`} className="size-9 shrink-0 rounded-xl object-contain" />
           ) : (
-            <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-700 text-lg text-white" aria-hidden>
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-lg text-white" aria-hidden>
               🛍️
             </span>
           )}
-          <span className="hidden text-lg sm:inline">{storeName}</span>
+          <span className="min-w-0 truncate text-base sm:text-lg">{storeName}</span>
         </button>
 
         {/* صندوق البحث (سطح المكتب) */}
