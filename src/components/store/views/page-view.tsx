@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { BookOpen } from 'lucide-react'
+import { BookOpen, ChevronRight } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorState } from '@/components/app/spinner'
 import { api } from '@/lib/client/api'
@@ -24,7 +24,7 @@ const SLUG_TITLES: Record<string, string> = {
 }
 
 export function PageView({ slug }: { slug: string }) {
-  const go = useNav((s) => s.go)
+  const back = useNav((s) => s.back)
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['page', slug],
     queryFn: () => api.get<ContentPage>(`/api/content/pages/${encodeURIComponent(slug)}`),
@@ -35,8 +35,13 @@ export function PageView({ slug }: { slug: string }) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-      <button type="button" onClick={() => go('home')} className="min-h-9 text-sm font-bold text-emerald-700 hover:underline dark:text-emerald-400">
-        ← الرئيسية
+      <button
+        type="button"
+        onClick={() => back()}
+        className="flex min-h-9 items-center gap-1 text-sm font-bold text-emerald-700 hover:underline dark:text-emerald-400"
+      >
+        <ChevronRight className="size-4" aria-hidden />
+        رجوع
       </button>
 
       <header className="flex items-center gap-3">

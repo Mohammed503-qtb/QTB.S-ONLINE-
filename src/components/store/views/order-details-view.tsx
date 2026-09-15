@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import {
   Ban,
   CheckCircle2,
+  ChevronRight,
   Circle,
   FileText,
   MessageCircle,
@@ -105,8 +106,13 @@ function OrderDetailsInner({ id }: { id: string }) {
     <div className="mx-auto max-w-3xl space-y-4 px-4 py-4">
       {/* الرأس */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <button type="button" onClick={() => back()} className="min-h-9 font-bold text-emerald-700 hover:underline dark:text-emerald-400">
-          ← رجوع
+        <button
+          type="button"
+          onClick={() => back()}
+          className="flex min-h-9 items-center gap-1 font-bold text-emerald-700 hover:underline dark:text-emerald-400"
+        >
+          <ChevronRight className="size-4" aria-hidden />
+          رجوع
         </button>
         <div className="flex flex-wrap items-center gap-1.5">
           <span className={cn('rounded-full px-3 py-1 text-xs font-bold', statusColor(order.status))}>{orderStatusLabel(order.status)}</span>

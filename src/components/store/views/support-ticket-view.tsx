@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Headphones, Send, User } from 'lucide-react'
+import { ChevronRight, Headphones, Send, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
@@ -29,7 +29,7 @@ export function SupportTicketView({ id }: { id: string }) {
 }
 
 function SupportTicketInner({ id }: { id: string }) {
-  const go = useNav((s) => s.go)
+  const back = useNav((s) => s.back)
   const qc = useQueryClient()
   const [message, setMessage] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -75,8 +75,13 @@ function SupportTicketInner({ id }: { id: string }) {
     <div className="mx-auto flex max-w-2xl flex-col px-4 py-4" style={{ minHeight: 'calc(100vh - 10rem)' }}>
       {/* رأس التذكرة */}
       <div className="space-y-2 rounded-2xl border bg-card p-4 shadow-sm">
-        <button type="button" onClick={() => go('support')} className="min-h-9 text-sm font-bold text-emerald-700 hover:underline dark:text-emerald-400">
-          ← كل التذاكر
+        <button
+          type="button"
+          onClick={() => back()}
+          className="flex min-h-9 items-center gap-1 text-sm font-bold text-emerald-700 hover:underline dark:text-emerald-400"
+        >
+          <ChevronRight className="size-4" aria-hidden />
+          رجوع
         </button>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h1 className="flex items-center gap-2 font-extrabold">

@@ -30,6 +30,7 @@ export function OrderSuccessView({ id }: { id: string }) {
 
 function OrderSuccessInner({ id }: { id: string }) {
   const go = useNav((s) => s.go)
+  const reset = useNav((s) => s.reset)
   const { data: config } = useConfig()
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -118,7 +119,8 @@ function OrderSuccessInner({ id }: { id: string }) {
       </div>
 
       <div className="text-center">
-        <Button variant="link" className="min-h-11" onClick={() => go('home')}>
+        {/* استبدال مدخل السجل: الرجوع بعد مغادرة شاشة النجاح يقود للرئيسية ولا يعيد إظهارها */}
+        <Button variant="link" className="min-h-11" onClick={() => reset('home')}>
           متابعة التسوق
         </Button>
       </div>

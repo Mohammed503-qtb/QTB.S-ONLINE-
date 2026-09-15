@@ -56,7 +56,7 @@ function CheckoutInner({ couponCode }: { couponCode?: string }) {
   const items = useCart((s) => s.items)
   const clear = useCart((s) => s.clear)
   const go = useNav((s) => s.go)
-  const replace = useNav((s) => s.replace)
+  const reset = useNav((s) => s.reset)
   const { data: config } = useConfig()
 
   const [step, setStep] = useState(1)
@@ -128,7 +128,10 @@ function CheckoutInner({ couponCode }: { couponCode?: string }) {
     onSuccess: (res) => {
       clear()
       toast.success(res.duplicated ? 'تم استرجاع طلبك السابق' : `تم إنشاء الطلب ${res.orderNumber} بنجاح`)
-      replace('order-success', { id: res.orderId })
+      // نمط أصلي: بعد إنشاء الطلب تصبح الرئيسية جذر الرجوع
+      // (لا يعود المستخدم لسلة فارغة أو شاشة دفع مكتملة عبر زر الرجوع)
+      reset('home')
+      go('order-success', { id: res.orderId })
     },
     onError: (e) => {
       const msg = e instanceof ApiClientError ? e.message : 'تعذر إنشاء الطلب — حاول مجددًا'

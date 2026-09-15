@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Heart, Minus, MessageCircleQuestion, Plus, ShoppingCart, Star } from 'lucide-react'
+import { ChevronRight, Heart, Minus, MessageCircleQuestion, Plus, ShoppingCart, Star } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -153,7 +153,8 @@ export function ProductView({ id }: { id: string }) {
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-4">
       {/* التنقل */}
       <nav aria-label="مسار التنقل" className="flex items-center gap-2 text-sm text-muted-foreground">
-        <button type="button" onClick={() => back()} className="min-h-9 font-medium text-emerald-700 hover:underline dark:text-emerald-400">
+        <button type="button" onClick={() => back()} className="flex min-h-9 items-center gap-1 font-medium text-emerald-700 hover:underline dark:text-emerald-400">
+          <ChevronRight className="size-4" aria-hidden />
           رجوع
         </button>
         <span aria-hidden>·</span>

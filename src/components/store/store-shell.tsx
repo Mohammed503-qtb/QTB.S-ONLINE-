@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Bell,
+  ChevronRight,
   Clock,
   LayoutDashboard,
   Headphones,
@@ -34,7 +35,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { EmptyState, FullSpinner } from '@/components/app/spinner'
 import { useConfig, useLogin, useSession } from '@/lib/client/session'
-import { useCart, useNav, useUi, whatsappLink } from '@/lib/client/stores'
+import { useCart, useNav, useUi, whatsappLink, TOP_LEVEL_VIEWS } from '@/lib/client/stores'
 import { LoginModal } from './components/login-modal'
 import { InstallBanner } from './components/install-banner'
 import { useInstallPrompt } from '@/lib/client/use-install-prompt'
@@ -71,39 +72,18 @@ const POLICY_LINKS: { slug: string; label: string }[] = [
   { slug: 'faq', label: 'الأسئلة الشائعة' },
 ]
 
-// شاشات صالحة للوصول العميق عبر ?view= (اختصارات التطبيق)
-const DEEP_VIEWS = new Set([
-  'home', 'catalog', 'cart', 'orders', 'order-details', 'favorites',
-  'track', 'returns', 'profile', 'addresses', 'notifications',
-  'support', 'page', 'product', 'checkout', 'order-success',
-  'return-new', 'support-ticket',
-])
-
 export function StoreShell({ preview }: { preview?: boolean }) {
   const { data: config } = useConfig()
   const view = useNav((s) => s.view)
   const params = useNav((s) => s.params)
-  const reset = useNav((s) => s.reset)
-  const go = useNav((s) => s.go)
 
   // تمرير لأعلى عند تغيير الشاشة (سلوك SPA)
   useEffect(() => {
     window.scrollTo({ top: 0 })
   }, [view, params])
 
-  // وصول عميق مرة واحدة عند الإقلاع: /?view=cart&id=… (اختصارات التطبيق المثبّت)
-  useEffect(() => {
-    const qs = new URLSearchParams(window.location.search)
-    const target = qs.get('view')
-    if (!target || !DEEP_VIEWS.has(target)) return
-    const navParams: Record<string, string> = {}
-    qs.forEach((value, key) => {
-      if (key !== 'view' && value) navParams[key] = value
-    })
-    go(target, navParams)
-    // تنظيف الرابط دون إعادة تحميل (سلوك تطبيق أصلي)
-    window.history.replaceState({}, '', '/')
-  }, [go])
+  // (الوصول العميق ?view= والاستعادة بعد إعادة التحميل يديرهما مخزن التنقل
+  //  مع تكامل History API — انظر src/lib/client/stores.ts)
 
   if (!config) return <FullSpinner label="جارِ تحميل المتجر..." />
 
@@ -114,7 +94,7 @@ export function StoreShell({ preview }: { preview?: boolean }) {
       {preview && (
         <div className="flex flex-wrap items-center justify-center gap-2 bg-amber-500 px-4 py-2 text-center text-sm font-bold text-amber-950">
           <span>أنت تعاين واجهة المتجر بصفتك إداريًا</span>
-          <Button size="sm" variant="outline" className="h-8 border-amber-800 bg-transparent text-amber-950 hover:bg-amber-100" onClick={() => reset('admin-dashboard')}>
+          <Button size="sm" variant="outline" className="h-8 border-amber-800 bg-transparent text-amber-950 hover:bg-amber-100" onClick={() => useNav.getState().reset('admin-dashboard')}>
             العودة إلى لوحة الإدارة
           </Button>
         </div>
@@ -168,12 +148,17 @@ export function StoreShell({ preview }: { preview?: boolean }) {
 function StoreHeader() {
   const { data: config } = useConfig()
   const { user, unread, isAuthenticated, isAdmin } = useSession()
+  const view = useNav((s) => s.view)
   const go = useNav((s) => s.go)
+  const back = useNav((s) => s.back)
   const openLogin = useUi((s) => s.openLogin)
   const { logout } = useLogin()
   const cartCount = useCart((s) => s.items.reduce((sum, i) => sum + i.quantity, 0))
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const { canInstall, isStandalone, install } = useInstallPrompt()
+
+  // زر الرجوع يظهر على الشاشات الثانوية فقط (المستوى الأعلى له شريط سفلي)
+  const showBack = !TOP_LEVEL_VIEWS.has(view) && view !== 'store-preview'
 
   const storeName = config?.settings.storeName ?? 'متجر الأصيل'
   const logo = config?.settings.storeLogoUrl
@@ -190,6 +175,19 @@ function StoreHeader() {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4">
+        {/* زر الرجوع (الشاشات الثانوية — سهم لليمين في RTL) */}
+        {showBack && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-11 shrink-0"
+            aria-label="الرجوع إلى الشاشة السابقة"
+            onClick={() => back()}
+          >
+            <ChevronRight className="size-6" aria-hidden />
+          </Button>
+        )}
+
         {/* الشعار واسم المتجر */}
         <button
           type="button"
@@ -299,6 +297,8 @@ function StoreHeader() {
                     try {
                       await logout()
                       toast.success('تم تسجيل الخروج')
+                      // تنظيف السجل قبل إعادة التحميل حتى لا تُستعاد شاشة خاصة بالعضوية
+                      useNav.getState().reset('home')
                       window.setTimeout(() => window.location.reload(), 400)
                     } catch {
                       toast.error('تعذر تسجيل الخروج')
