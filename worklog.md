@@ -289,3 +289,36 @@ E2E (agent-browser):
 
 Stage Summary:
 - المشكلتان الشاشيتان (الاهتزاز الأفقي + اختفاء اسم المتجر بالهاتف) محسومتان من الجذر مع تصحيح دلالة أسهم RTL (السابق=يمين، التالي=يسار) وشبكة أمان page-wide
+
+---
+Task ID: 13
+Agent: orchestrator (main)
+Task: تحويل المتجر إلى تطبيق هاتف مثبَّت (PWA) بتجربة مطابقة للتطبيقات الأصلية
+
+Work Log:
+- أيقونة تطبيق احترافية مولّدة بالذكاء الاصطناعي (زمردية + حقيبة بيضاء + لمسة ذهبية، بلا نصوص) وتحويلها بـ sharp إلى: 192/512/1024 + maskable-512 (محتوى داخل منطقة آمنة 80% فوق خلفية زمردية) + apple-touch-icon 180 — تحقق VLM ناجح
+- public/manifest.webmanifest: standalone + portrait + dir rtl + lang ar + theme #0d9468 + 3 أيقونات (any/maskable) + 3 اختصارات تطبيق (سلة/طلباتي/أقسام عبر /?view=)
+- public/sw.js: تنقلات شبكة-أولاً مع سقوط offline.html + أيقونات وصور المنتجات و_-next/static تخزين-أولاً + خطوط Google stale-while-revalidate + API شبكة-فقط (بيانات أعمال لا تُخزن) + تنظيف إصدارات قديمة + SKIP_WAITING للتحديث الفوري
+- public/offline.html: صفحة عربية RTL مستقلة (CSS مضمّن، زمن آمن سفلي، زر إعادة محاولة، عودة تلقائية عند عودة الاتصال عبر online event)
+- layout.tsx: manifest + أيقونات + appleWebApp (capable/statusBar/title) + وسم apple-mobile-web-app-capable القديم يدوياً (Next يولّد الحديث فقط) + viewportFit cover + themeColor للوضعين + formatDetection telephone off
+- pwa-register.tsx: تسجيل SW بعد اكتمال التحميل + استماع updatefound وقفزة إصدار
+- globals.css (إحساس أصلي): overscroll-behavior-y none (لا pull-to-refresh) + touch-action manipulation (لا تأخير 300ms ولا تكبير نقر مزدوج) + tap-highlight شفاف + منع touch-callout/user-select على عناصر الواجهة مع السماح بالتحديد في الحقول والمحتوى + أداة no-scrollbar
+- StoreShell: min-h-dvh (لا قفز شريط عنوان المتصفح) + pt-[env(safe-area-inset-top)] للهيدر + ظل علوي للشريط السفلي + تغذية لمسية active:scale-95 + FAB وفوتر يحترمان المنطقة الآمنة + وصول عميق مرة واحدة عند الإقلاع /?view=cart&id=… مع تنظيف الرابط بلا إعادة تحميل
+- product-row: snap-x snap-mandatory + overscroll-x-contain + no-scrollbar (إحساس أصلي للصف الأفقي)
+- install-banner.tsx + use-install-prompt.ts: خطاف useSyncExternalStore (متوافق مع قواعد React Compiler lint) يلتقط beforeinstallprompt + يكشف standalone/iOS (يشمل iPadOS المتنكر كـ Mac) + شريط تثبيت ذكي فوق الشريط السفلي (موبايل) قابلة للإخفاء مع localStorage + حوار تعليمات iOS بثلاث خطوات + عنصر "تثبيت التطبيق" في قائمة الحساب
+- إصلاح lint: react-hooks/set-state-in-effect (2 أخطاء) بإعادة الكتابة عبر useSyncExternalStore بدل setState المتزامن في effects
+
+E2E (agent-browser 390px):
+- الرأس: manifest موصول + viewport-fit=cover + themeColor #0d9468 + apple-capable القديم والحديث + apple-touch-icon + العنوان
+- SW: registered + scope / + activated — و3 ذاكرات (static/pages/assets)
+- Precache مثبت عبر Cache API مباشرة: offline.html + manifest + 4 أيقونات قابلة للاسترجاع (offlineServed=true)
+- كل أصول PWA ترجع 200 (أيقونات/offline/sw)
+- شريط التثبيت: يظهر بحدث اصطناعي في موضع مثالي (top 686 فوق الشريط السفلي، داخل الشاشة) + نقر "تثبيت" → اختفاء بعد القبول + نقر الإخفاء → persist في localStorage
+- الوصول العميق: /?view=cart → سلة التسوق تفتح والرابط يُنظف إلى / بلا reload
+- قطع الشبكة (network route abort): أصول JS/CSS جاءت من ذاكرة SW (التطبيق hydrate بنجاح) وAPI فشل فقط → خطأ عربي رشيق "تعذر الاتصال بالمتجر" مع زر إعادة محاولة — (محاكاة offline وroute-abort لا تعترضا طلبات SW في Chromium — قيد معروف — لذا أثبتنا سلسلة offline عبر Cache API المباشر)
+- موبايل: dvh + safe-area هيدر/سفلي + snap + no-scrollbar + صفر تمرير أفقي (390=390) + اسم المتجر ظاهر
+- VLM: "تبدو كتطبيق أصلي" + شريط سفلي كامل + لا عناصر مقطوعة
+- صفر أخطاء كونسول/صفحة + dev.log نظيف + lint نظيف
+
+Stage Summary:
+- المتجر الآن PWA كامل: يثبَّت على الشاشة الرئيسية (Android عبر beforeinstallprompt + شريط ذكي، iOS عبر حوار تعليمات)، يعمل standalone بلا متصفح، أيقونة واختصارات تطبيق، عمل بلا إنترنت (offline.html + أصول مخزنة)، دعم نوتش/مناطق آمنة، وسلوكيات لمس أصلية (لا pull-to-refresh، لا تأخير نقر، snap، dvh)

@@ -35,9 +35,9 @@ export function ProductRow({
           </button>
         )}
       </div>
+      {/* صف أفقي بإحساس التطبيق: snap + بلا شريط تمرير + احتواء السحب */}
       <div
-        className="scrollbar-thin flex gap-3 overflow-x-auto pb-2"
-        style={{ scrollbarWidth: 'thin' }}
+        className="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2"
         role="list"
         aria-label={title}
       >

@@ -1,0 +1,55 @@
+{
+  "id": "/",
+  "name": "متجر الأصيل — تسوق بثقة",
+  "short_name": "متجر الأصيل",
+  "description": "متجر إلكتروني يمني متكامل: أزياء، عطور، إلكترونيات وأكثر مع توصيل لجميع المحافظات ودفع بالتحويل البنكي أو عند الاستلام.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "dir": "rtl",
+  "lang": "ar",
+  "background_color": "#ffffff",
+  "theme_color": "#0d9468",
+  "categories": ["shopping", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "سلة التسوق",
+      "short_name": "السلة",
+      "url": "/?view=cart",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "طلباتي",
+      "short_name": "الطلبات",
+      "url": "/?view=orders",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "الأقسام",
+      "short_name": "الأقسام",
+      "url": "/?view=catalog",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}

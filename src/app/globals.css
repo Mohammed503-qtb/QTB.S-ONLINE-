@@ -116,10 +116,52 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    /* إحساس تطبيق أصلي: منع pull-to-refresh والمطاطية الرأسية */
+    overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
+  }
   body {
     @apply bg-background text-foreground;
     /* منع أي تمرير أفقي للصفحة كاملة (RTL) — clip لا ينشئ حاوية
        تمرير فلا يتعارض مع sticky الهيدر ولا fixed الشريط السفلي */
     overflow-x: clip;
+    /* إزالة تأخير النقر 300ms وتكبير النقر المزدوج (سلوك تطبيق) */
+    touch-action: manipulation;
+    /* لا وميض رمادي عند اللمس (iOS/Android) */
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* لا قائمة iOS (نسخ/مشاركة/تعريف) عند الضغط المطول على عناصر الواجهة */
+  button,
+  a,
+  [role='button'],
+  nav,
+  header,
+  footer,
+  aside,
+  img {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  /* السماح بتحديد النص حيث له معنى (حقول ونصوص المحتوى) */
+  input,
+  textarea,
+  select,
+  [contenteditable='true'],
+  article {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+@layer utilities {
+  /* إخفاء شريط التمرير (صفوف المنتجات الأفقية — إحساس أصلي) */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 }

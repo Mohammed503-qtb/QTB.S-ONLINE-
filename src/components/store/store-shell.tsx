@@ -16,6 +16,7 @@ import {
   Phone,
   Search,
   ShoppingCart,
+  Smartphone,
   Store,
   User,
   X,
@@ -35,6 +36,8 @@ import { EmptyState, FullSpinner } from '@/components/app/spinner'
 import { useConfig, useLogin, useSession } from '@/lib/client/session'
 import { useCart, useNav, useUi, whatsappLink } from '@/lib/client/stores'
 import { LoginModal } from './components/login-modal'
+import { InstallBanner } from './components/install-banner'
+import { useInstallPrompt } from '@/lib/client/use-install-prompt'
 import { HomeView } from './views/home-view'
 import { CatalogView } from './views/catalog-view'
 import { ProductView } from './views/product-view'
@@ -68,23 +71,46 @@ const POLICY_LINKS: { slug: string; label: string }[] = [
   { slug: 'faq', label: 'الأسئلة الشائعة' },
 ]
 
+// شاشات صالحة للوصول العميق عبر ?view= (اختصارات التطبيق)
+const DEEP_VIEWS = new Set([
+  'home', 'catalog', 'cart', 'orders', 'order-details', 'favorites',
+  'track', 'returns', 'profile', 'addresses', 'notifications',
+  'support', 'page', 'product', 'checkout', 'order-success',
+  'return-new', 'support-ticket',
+])
+
 export function StoreShell({ preview }: { preview?: boolean }) {
   const { data: config } = useConfig()
   const view = useNav((s) => s.view)
   const params = useNav((s) => s.params)
   const reset = useNav((s) => s.reset)
+  const go = useNav((s) => s.go)
 
   // تمرير لأعلى عند تغيير الشاشة (سلوك SPA)
   useEffect(() => {
     window.scrollTo({ top: 0 })
   }, [view, params])
 
+  // وصول عميق مرة واحدة عند الإقلاع: /?view=cart&id=… (اختصارات التطبيق المثبّت)
+  useEffect(() => {
+    const qs = new URLSearchParams(window.location.search)
+    const target = qs.get('view')
+    if (!target || !DEEP_VIEWS.has(target)) return
+    const navParams: Record<string, string> = {}
+    qs.forEach((value, key) => {
+      if (key !== 'view' && value) navParams[key] = value
+    })
+    go(target, navParams)
+    // تنظيف الرابط دون إعادة تحميل (سلوك تطبيق أصلي)
+    window.history.replaceState({}, '', '/')
+  }, [go])
+
   if (!config) return <FullSpinner label="جارِ تحميل المتجر..." />
 
   const whatsappEnabled = config.flags.whatsapp_enabled !== false
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-dvh flex-col bg-background">
       {preview && (
         <div className="flex flex-wrap items-center justify-center gap-2 bg-amber-500 px-4 py-2 text-center text-sm font-bold text-amber-950">
           <span>أنت تعاين واجهة المتجر بصفتك إداريًا</span>
@@ -115,6 +141,9 @@ export function StoreShell({ preview }: { preview?: boolean }) {
       {/* شريط التنقل السفلي (موبايل فقط) */}
       <BottomNav />
 
+      {/* شريط تثبيت التطبيق (PWA) */}
+      <InstallBanner />
+
       {/* زر واتساب العائم */}
       {whatsappEnabled && (
         <a
@@ -122,7 +151,7 @@ export function StoreShell({ preview }: { preview?: boolean }) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label="تواصل عبر واتساب"
-          className="fixed bottom-20 end-4 z-50 flex size-14 items-center justify-center rounded-full bg-[#22c55e] text-white shadow-lg shadow-emerald-900/30 transition-transform hover:scale-110 lg:bottom-6"
+          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] end-4 z-40 flex size-14 items-center justify-center rounded-full bg-[#22c55e] text-white shadow-lg shadow-emerald-900/30 transition-transform hover:scale-110 lg:bottom-6"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" className="size-7" aria-hidden>
             <path d="M17.472 14.382c-.297-.148-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.148-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
@@ -144,6 +173,7 @@ function StoreHeader() {
   const { logout } = useLogin()
   const cartCount = useCart((s) => s.items.reduce((sum, i) => sum + i.quantity, 0))
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const { canInstall, isStandalone, install } = useInstallPrompt()
 
   const storeName = config?.settings.storeName ?? 'متجر الأصيل'
   const logo = config?.settings.storeLogoUrl
@@ -158,7 +188,7 @@ function StoreHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <header className="sticky top-0 z-40 border-b bg-background/95 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4">
         {/* الشعار واسم المتجر */}
         <button
@@ -242,6 +272,11 @@ function StoreHeader() {
                 {isAdmin && (
                   <DropdownMenuItem onClick={() => go('admin-dashboard')} className="min-h-10 cursor-pointer font-medium text-emerald-700 focus:text-emerald-700">
                     <LayoutDashboard className="size-4" aria-hidden /> لوحة الإدارة
+                  </DropdownMenuItem>
+                )}
+                {canInstall && !isStandalone && (
+                  <DropdownMenuItem onClick={() => void install()} className="min-h-10 cursor-pointer">
+                    <Smartphone className="size-4" aria-hidden /> تثبيت التطبيق
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
@@ -418,7 +453,7 @@ function StoreFooter({ whatsappEnabled }: { whatsappEnabled: boolean }) {
         </nav>
       </div>
 
-      <div className="border-t px-4 pb-20 pt-4 text-center text-xs text-muted-foreground lg:pb-4">
+      <div className="border-t px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 text-center text-xs text-muted-foreground lg:pb-4">
         © {new Date().getFullYear()} {s.storeName} — جميع الحقوق محفوظة · صنع بحب في اليمن 🇾🇪
       </div>
     </footer>
@@ -443,7 +478,7 @@ function BottomNav() {
   return (
     <nav
       aria-label="التنقل الرئيسي"
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_12px_rgba(0,0,0,0.04)] backdrop-blur lg:hidden"
     >
       {items.map((item) => {
         const active = view === item.view || (item.view === 'catalog' && view.startsWith('catal'))
@@ -454,7 +489,7 @@ function BottomNav() {
             onClick={() => go(item.view)}
             aria-label={item.label}
             aria-current={active ? 'page' : undefined}
-            className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${
+            className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-[color,transform] active:scale-95 ${
               active ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'
             }`}
           >
@@ -476,7 +511,7 @@ function BottomNav() {
         onClick={() => (isAuthenticated ? go('profile') : openLogin())}
         aria-label="حسابي"
         aria-current={view === 'profile' ? 'page' : undefined}
-        className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${
+        className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-[color,transform] active:scale-95 ${
           view === 'profile' ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'
         }`}
       >
